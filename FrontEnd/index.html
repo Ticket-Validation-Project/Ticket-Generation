@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Panel - Ticket Booking & Validation</title>
+    <script type="module">
+        // ✅ Import Firebase Modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // ✅ Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGdMUB4UsOVP2a-ySu4FK7B6psWxQhRjk",
+            authDomain: "geofence-ticket.firebaseapp.com",
+            projectId: "geofence-ticket",
+            storageBucket: "geofence-ticket.appspot.com", // ✅ Fixed storage bucket
+            messagingSenderId: "333949750287",
+            appId: "1:333949750287:web:32fa1c290472311076a77a"
+        };
+
+        // ✅ Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // ✅ Function to Book a Ticket
+        async function bookTicket() {
+            const userName = document.getElementById("userName").value.trim();
+            if (!userName) {
+                alert("⚠️ Please enter your name.");
+                return;
+            }
+
+            const ticketNumber = "CN" + Math.floor(100000 + Math.random() * 900000);
+            await setDoc(doc(db, "userTickets", ticketNumber), {
+                name: userName,
+                ticketNumber: ticketNumber,
+                status: "Pending"
+            });
+
+            document.getElementById("ticketName").innerText = userName;
+            document.getElementById("ticketNumber").innerText = ticketNumber;
+            document.getElementById("ticket").style.display = "block";
+
+            alert("✅ Ticket booked successfully!");
+        }
+
+        // ✅ Function to Validate User Location
+        async function validateLocation() {
+            if (!navigator.geolocation) {
+                alert("⚠️ Geolocation is not supported by your browser.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+
+                    const geofenceDoc = await getDoc(doc(db, "geofenceSettings", "concertLocation"));
+                    if (!geofenceDoc.exists()) {
+                        alert("⚠️ Geofence not set by admin.");
+                        return;
+                    }
+
+                    const { latitude, longitude, radius } = geofenceDoc.data();
+                    const distance = getDistance(userLat, userLon, latitude, longitude);
+
+                    if (distance <= radius) {
+                        document.getElementById("validationStatus").style.color = "green";
+                        document.getElementById("validationStatus").innerText = "✅ Entry Approved!";
+                    } else {
+                        document.getElementById("validationStatus").style.color = "red";
+                        document.getElementById("validationStatus").innerText = "❌ Out of Concert Area!";
+                    }
+                },
+                (error) => {
+                    alert("⚠️ Error getting location. Make sure GPS is enabled.");
+                }
+            );
+        }
+
+        // ✅ Function to Calculate Distance Between Two Coordinates
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * (Math.PI / 180);
+            const φ2 = lat2 * (Math.PI / 180);
+            const Δφ = (lat2 - lat1) * (Math.PI / 180);
+            const Δλ = (lon2 - lon1) * (Math.PI / 180);
+            
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // ✅ Make Functions Global
+        window.bookTicket = bookTicket;
+        window.validateLocation = validateLocation;
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .container {
+            max-width: 400px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        }
+        input, button {
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            background: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .ticket {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        }
+        #validationStatus {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>User Panel - Book a Ticket</h2>
+        <input type="text" id="userName" placeholder="Enter your name">
+        <button onclick="bookTicket()">Book Ticket</button>
+
+        <div id="ticket" class="ticket">
+            <h3>🎟️ Concert Ticket</h3>
+            <p><strong>Name:</strong> <span id="ticketName"></span></p>
+            <p><strong>Ticket Number:</strong> <span id="ticketNumber"></span></p>
+            <p><strong>Event:</strong> Live Concert 2025</p>
+        </div>
+
+        <h2>Validate Ticket Entry</h2>
+        <button onclick="validateLocation()">Check My Location</button>
+        <p id="validationStatus"></p>
+    </div>
+</body>
+</html>
