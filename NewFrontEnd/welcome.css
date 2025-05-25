@@ -123,5 +123,10 @@ html, body {
   padding: 1rem;
   border-radius: 10px;
   width: 220px;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 12px rgba(229, 9, 20, 0.5); /* stronger red glow */
+  transition: box-shadow 0.3s ease;
+}
+
+.testimonial-card:hover {
+  box-shadow: 0 6px 20px rgba(229, 9, 20, 0.8);
 }
