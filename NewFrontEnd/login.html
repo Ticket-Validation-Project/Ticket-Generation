@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Login</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="admin-container">
+    <div class="admin-left"></div>
+    <div class="admin-right">
+      <form id="login-form" class="admin-form">
+        <h2 class="admin-heading">User Login</h2>
+
+        <label class="admin-label" for="email">Email</label>
+        <input class="admin-input" type="email" id="email" required />
+
+        <label class="admin-label" for="password">Password</label>
+        <input class="admin-input" type="password" id="password" required />
+
+        <label class="admin-label" for="role">Role</label>
+        <select class="admin-input" id="role" required>
+          <option value="">Select role</option>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <button class="admin-button" type="submit">Login</button>
+        <p id="error-msg" style="color: red;"></p>
+
+        <p class="admin-label" style="margin-top: 20px; text-align: center;">
+          Don't have an account?
+          <a href="signup.html" style="color: #e50914;">Sign Up here</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCQ_HSovhRU9pG_zCU2IvNoiUmgUkwnlvw",
+    authDomain: "ticket-validation-c4a51.firebaseapp.com",
+    projectId: "ticket-validation-c4a51",
+    storageBucket: "ticket-validation-c4a51.appspot.com",
+    messagingSenderId: "585352461746",
+    appId: "1:585352461746:web:1f58b83c779c7be37178ab",
+    measurementId: "G-88R4J50W8T"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const uid = userCredential.user.uid;
+
+      // Fetch user role from Firestore
+      const docRef = doc(db, "users", uid);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        const role = userData.role;
+
+        if (role === "admin") {
+          window.location.href = "AdminAddEvent.html";
+        } else if (role === "user") {
+          window.location.href = "eventsPage.html";
+        } else {
+          window.location.href = "welcome.html"; // fallback page
+        }
+      } else {
+        document.getElementById("error-msg").textContent = "User data not found!";
+      }
+    } catch (error) {
+      document.getElementById("error-msg").textContent = error.message;
+      console.error("Login failed:", error);
+    }
+    
+  });
+</script>
+
+</body>
+</html>

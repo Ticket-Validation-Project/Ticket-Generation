@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign Up</title>
+  <link rel="stylesheet" href="auth.css" />
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-left"></div>
+    <div class="auth-right">
+      <form class="auth-form" id="signupForm">
+        <h2 class="auth-heading">Create Account</h2>
+
+        <label class="auth-label" for="name">Name</label>
+        <input class="auth-input" type="text" id="name" name="name" required />
+
+        <label class="auth-label" for="email">Email</label>
+        <input class="auth-input" type="email" id="email" name="email" required />
+
+        <label class="auth-label" for="password">Password</label>
+        <input class="auth-input" type="password" id="password" name="password" required />
+
+        <label class="auth-label" for="role">Role</label>
+        <select class="auth-input" id="role" name="role" required>
+          <option value="">Select role</option>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <button class="auth-button" type="submit">Sign Up</button>
+
+        <p class="auth-bottom-text">
+          Already have an account?
+          <a href="login.html" class="auth-link">Login here</a>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQ_HSovhRU9pG_zCU2IvNoiUmgUkwnlvw",
+      authDomain: "ticket-validation-c4a51.firebaseapp.com",
+      projectId: "ticket-validation-c4a51",
+      storageBucket: "ticket-validation-c4a51.appspot.com",
+      messagingSenderId: "585352461746",
+      appId: "1:585352461746:web:1f58b83c779c7be37178ab",
+      measurementId: "G-88R4J50W8T"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = e.target.name.value.trim();
+      const email = e.target.email.value.trim();
+      const password = e.target.password.value;
+      const role = e.target.role.value;
+
+      if (!role) {
+        alert("Please select a role");
+        return;
+      }
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
+
+        await setDoc(doc(db, "users", uid), {
+          name: name,
+          email: email,
+          role: role,
+          createdAt: new Date()
+        });
+
+        alert("Signup successful!");
+        window.location.href = "login.html";
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    });
+  </script>
+</body>
+</html>

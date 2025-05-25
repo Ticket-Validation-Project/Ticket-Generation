@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Set Geofence</title>
+  <link rel="stylesheet" href="setupGeofence.css" />
+</head>
+<body>
+  <div class="admin-container">
+    <div class="admin-left"></div>
+    <div class="admin-right">
+      <form class="admin-form" id="geofenceForm">
+        <h2 class="admin-heading">Set Geofence for Event</h2>
+
+        <label class="admin-label">Select Event:</label>
+        <select class="admin-input" name="eventId" id="eventSelect" required>
+          <option value="">-- Select Event --</option>
+        </select>
+
+        <label class="admin-label">Latitude:</label>
+        <input class="admin-input" type="number" step="any" name="latitude" required />
+
+        <label class="admin-label">Longitude:</label>
+        <input class="admin-input" type="number" step="any" name="longitude" required />
+
+        <label class="admin-label">Radius (in meters):</label>
+        <input class="admin-input" type="number" name="radius" required />
+
+        <button class="admin-button" type="submit">Set Geofence</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      setDoc,
+      collection,
+      getDocs
+    } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQ_HSovhRU9pG_zCU2IvNoiUmgUkwnlvw",
+      authDomain: "ticket-validation-c4a51.firebaseapp.com",
+      projectId: "ticket-validation-c4a51",
+      storageBucket: "ticket-validation-c4a51.appspot.com",
+      messagingSenderId: "585352461746",
+      appId: "1:585352461746:web:1f58b83c779c7be37178ab",
+      measurementId: "G-88R4J50W8T"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Load events into the dropdown
+    async function loadEventIds() {
+      const eventSelect = document.getElementById("eventSelect");
+      try {
+        const eventsSnapshot = await getDocs(collection(db, "events"));
+        eventsSnapshot.forEach((docSnap) => {
+          const option = document.createElement("option");
+          option.value = docSnap.id; // Use actual Firestore document ID as value
+          option.textContent = docSnap.data().name || docSnap.id; // Show event name or ID
+          eventSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error("Error loading events:", error);
+        alert("Failed to load events.");
+      }
+    }
+
+    // Restrict access to admins only
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (!userDoc.exists() || userDoc.data().role !== "admin") {
+        alert("Access denied. Admins only.");
+        window.location.href = "eventsPage.html";
+      } else {
+        loadEventIds(); // Load dropdown after admin is verified
+      }
+    });
+
+    // Handle geofence form submission
+    const geofenceForm = document.getElementById("geofenceForm");
+    geofenceForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const geofenceData = Object.fromEntries(formData.entries());
+
+      geofenceData.latitude = parseFloat(geofenceData.latitude);
+      geofenceData.longitude = parseFloat(geofenceData.longitude);
+      geofenceData.radius = parseFloat(geofenceData.radius);
+
+      try {
+        const geofenceRef = doc(db, "geofences", geofenceData.eventId);
+        await setDoc(geofenceRef, geofenceData);
+        alert("Geofence set successfully!");
+        geofenceForm.reset();
+      } catch (error) {
+        console.error("Error setting geofence:", error);
+        alert("Failed to set geofence.");
+      }
+    });
+  </script>
+</body>
+</html>

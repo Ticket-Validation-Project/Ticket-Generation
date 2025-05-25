@@ -1,0 +1,98 @@
+<!-- addEvent.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Add New Event</title>
+  <link rel="stylesheet" href="addEvent.css" />
+</head>
+<body>
+  <div class="admin-container">
+    <div class="admin-left"></div>
+    <div class="admin-right">
+      <form class="admin-form" id="eventForm">
+        <h2 class="admin-heading">Add New Event</h2>
+
+        <label class="admin-label">Event Name:</label>
+        <input class="admin-input" type="text" name="name" required />
+
+        <label class="admin-label">Date:</label>
+        <input class="admin-input" type="date" name="date" required />
+
+        <label class="admin-label">Time:</label>
+        <input class="admin-input" type="time" name="time" required />
+
+        <label class="admin-label">Location:</label>
+        <input class="admin-input" type="text" name="location" required />
+
+        <label class="admin-label">Description:</label>
+        <textarea class="admin-textarea" name="description" rows="4" required></textarea>
+
+        <button class="admin-button" type="submit">Add Event</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDK and Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQ_HSovhRU9pG_zCU2IvNoiUmgUkwnlvw",
+      authDomain: "ticket-validation-c4a51.firebaseapp.com",
+      projectId: "ticket-validation-c4a51",
+      storageBucket: "ticket-validation-c4a51.appspot.com",
+      messagingSenderId: "585352461746",
+      appId: "1:585352461746:web:1f58b83c779c7be37178ab",
+      measurementId: "G-88R4J50W8T"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Admin check
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        alert("User data not found.");
+        window.location.href = "login.html";
+        return;
+      }
+      const userData = docSnap.data();
+      if (userData.role !== "admin") {
+        alert("Access denied. You are not an admin.");
+        window.location.href = "eventsPage.html";
+      }
+    });
+
+    // Add event and redirect to setupGeofence with event ID
+    document.getElementById('eventForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const eventData = Object.fromEntries(formData.entries());
+
+      try {
+        eventData.createdAt = serverTimestamp();
+
+        const docRef = await addDoc(collection(db, "events"), eventData);
+        console.log('Event added with ID:', docRef.id);
+
+        // Redirect to geofence setup page with event ID
+        window.location.href = `setupGeofence.html?eventId=${docRef.id}`;
+      } catch (error) {
+        console.error("Error adding event:", error);
+        alert("Failed to add event. Please try again.");
+      }
+    });
+  </script>
+</body>
+</html>

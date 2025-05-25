@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Bookings</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+    .user-navbar {
+      background: #333;
+      color: white;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .user-navbar h2 { margin: 0; }
+    .nav-links a {
+      color: white;
+      margin-left: 1rem;
+      text-decoration: none;
+    }
+    .nav-links a:hover { text-decoration: underline; }
+
+    .bookings-page {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .booking-card {
+      border: 1px solid #ddd;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 4px;
+      background: #fafafa;
+    }
+    button.validate-button {
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      background: #28a745;
+      border: none;
+      color: white;
+      border-radius: 4px;
+    }
+    button.validate-button:hover {
+      background: #218838;
+    }
+    .status {
+      margin-left: 1rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <nav class="user-navbar">
+    <h2>User Panel</h2>
+    <div class="nav-links">
+      <a href="/user/events.html">Events</a>
+      <a href="/user/profile.html">Profile</a>
+      <a href="/user/bookings.html">My Bookings</a>
+      <a href="/user/logout.html">Logout</a>
+    </div>
+  </nav>
+
+  <div class="bookings-page">
+    <header>
+      <h1>My Bookings</h1>
+      <p>Validate your ticket by checking your location at the event.</p>
+    </header>
+    <div id="bookingsList"><p>Loading your bookings...</p></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      getDocs,
+      doc,
+      getDoc,
+      updateDoc
+    } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCQ_HSovhRU9pG_zCU2IvNoiUmgUkwnlvw",
+      authDomain: "ticket-validation-c4a51.firebaseapp.com",
+      projectId: "ticket-validation-c4a51",
+      storageBucket: "ticket-validation-c4a51.appspot.com",
+      messagingSenderId: "585352461746",
+      appId: "1:585352461746:web:1f58b83c779c7be37178ab",
+      measurementId: "G-88R4J50W8T"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const bookingsList = document.getElementById('bookingsList');
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await loadUserBookings(user.uid);
+      } else {
+        window.location.href = "login.html";
+      }
+    });
+
+    async function loadUserBookings(userId) {
+      bookingsList.innerHTML = "<p>Loading your bookings...</p>";
+
+      try {
+        const bookingsQuery = query(collection(db, "bookings"), where("userId", "==", userId));
+        const bookingsSnapshot = await getDocs(bookingsQuery);
+
+        if (bookingsSnapshot.empty) {
+          bookingsList.innerHTML = "<p>You have no bookings yet.</p>";
+          return;
+        }
+
+        bookingsList.innerHTML = "";
+
+        for (const bookingDoc of bookingsSnapshot.docs) {
+          const booking = bookingDoc.data();
+
+          const eventDoc = await getDoc(doc(db, "events", booking.eventId));
+          if (!eventDoc.exists()) continue;
+          const event = eventDoc.data();
+
+          const card = document.createElement("div");
+          card.className = "booking-card";
+
+          const bookedOn = booking.timestamp?.toDate().toLocaleString() || "N/A";
+          const statusText = booking.validated ? "Validated" : "Not validated";
+
+          card.innerHTML = `
+            <h3>${event.name}</h3>
+            <p><strong>Date:</strong> ${event.date}</p>
+            <p><strong>Location:</strong> ${event.location}</p>
+            <p><strong>Booked On:</strong> ${bookedOn}</p>
+            <p><strong>Status:</strong> <span class="status">${statusText}</span></p>
+            ${!booking.validated ? `<button class="validate-button" data-booking-id="${bookingDoc.id}" data-event-id="${booking.eventId}">Validate</button>` : ""}
+          `;
+
+          bookingsList.appendChild(card);
+        }
+      } catch (error) {
+        console.error("Error loading bookings:", error);
+        bookingsList.innerHTML = "<p>Failed to load bookings. Try again later.</p>";
+      }
+    }
+
+    document.addEventListener('click', async (e) => {
+      if (!e.target.classList.contains('validate-button')) return;
+
+      const bookingId = e.target.getAttribute('data-booking-id');
+      const eventId = e.target.getAttribute('data-event-id');
+
+      try {
+        // Check if geofence exists
+        const geofenceDoc = await getDoc(doc(db, "geofences", eventId));
+        if (!geofenceDoc.exists()) {
+          alert("No geofence defined for this event.");
+          return;
+        }
+        const geo = geofenceDoc.data();
+
+        // Get user's current location (with permission)
+        const userCoords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            position => resolve(position.coords),
+            error => reject(error)
+          );
+        });
+
+        // Calculate distance between user and event geofence center
+        const distance = getDistanceFromLatLonInKm(
+          userCoords.latitude,
+          userCoords.longitude,
+          geo.latitude,
+          geo.longitude
+        );
+
+        if (distance <= geo.radiusKm) {
+          const user = auth.currentUser;
+          if (!user) {
+            alert("User not authenticated.");
+            return;
+          }
+
+          // Verify booking document exists before updating
+          const bookingRef = doc(db, "bookings", bookingId);
+          const bookingSnap = await getDoc(bookingRef);
+          if (!bookingSnap.exists()) {
+            alert("Booking does not exist.");
+            return;
+          }
+
+          // Update booking as validated
+          await updateDoc(bookingRef, { validated: true });
+
+          alert("Ticket validated successfully!");
+          await loadUserBookings(user.uid);
+        } else {
+          alert("You are not within the event location radius. Move closer to validate.");
+        }
+      } catch (error) {
+        console.error("Validation error:", error);
+        alert(`Booking failed: ${error.message || error}`);
+      }
+    });
+
+    // Haversine formula to calculate distance between two lat/lon points in km
+    function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+      const R = 6371; // Earth radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+  </script>
+</body>
+</html>
